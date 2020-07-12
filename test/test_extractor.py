@@ -1,7 +1,8 @@
 import sys
 import unittest
+from io import StringIO
 
-from WikiExtractor import Extractor
+from WikiExtractor import Extractor, dropNested
 
 lines_str = """
 {{存命人物の出典明記|date=2012年3月}}
@@ -220,24 +221,29 @@ lines = lines_str.splitlines()
 
 class TestExtractor(unittest.TestCase):
     def setUp(self) -> None:
-        self.extractor = Extractor(123, 77, "Extractor.title", lines)
+        self.extractor = Extractor(123, 77, 'Extractor.title', lines)
+
+    def test_extract(self):
+        out = StringIO()
+        self.extractor.extract(out)
+        print(out.getvalue())
 
     def test_transform(self):
-        input_text = "AAA {{BBB}} CCC <nowiki>DDD {{EEE}} FFF</nowiki>"
-        expected = "AAA  CCC <nowiki>DDD {{EEE}} FFF</nowiki>"
+        input_text = 'AAA {{BBB}} CCC <nowiki>DDD {{EEE}} FFF</nowiki>'
+        expected = 'AAA  CCC <nowiki>DDD {{EEE}} FFF</nowiki>'
         result = self.extractor.transform(input_text)
         self.assertEqual(result, expected)
 
     def test_transform_in_double_nowiki(self):
-        input_text = "<nowiki>{{AAA}}</nowiki>{{BBB}}<nowiki>{{CCC}}</nowiki>"
-        expected = "<nowiki>{{AAA}}</nowiki><nowiki>{{CCC}}</nowiki>"
+        input_text = '<nowiki>{{AAA}}</nowiki>{{BBB}}<nowiki>{{CCC}}</nowiki>'
+        expected = '<nowiki>{{AAA}}</nowiki><nowiki>{{CCC}}</nowiki>'
         result = self.extractor.transform(input_text)
         self.assertEqual(result, expected)
 
     def test_wiki2text(self):
-        input_text = "AAA  CCC [[aiee]]<nowiki>DDD {{EEE}} FFF</nowiki>"
+        input_text = 'AAA  CCC [[aiee]]<nowiki>DDD {{EEE}} FFF</nowiki>'
         result = self.extractor.wiki2text(input_text)
-        expected = "AAA  CCC aiee<nowiki>DDD  FFF</nowiki>"
+        expected = 'AAA  CCC aiee<nowiki>DDD  FFF</nowiki>'
         self.assertEqual(result, expected)
 
     def test_split(self):
@@ -246,6 +252,18 @@ class TestExtractor(unittest.TestCase):
         # check that s.split fails when the separator is not a string
         with self.assertRaises(TypeError):
             s.split(2)
+
+
+class TestFunctions(unittest.TestCase):
+    def test_dropNested(self):
+        input_text = 'AAA {{BBB {{CCC}}}} DDD {{EEE}}'
+        result = dropNested(input_text, r"{{", r"}}")
+        self.assertEqual(result, 'AAA  DDD ')
+
+    def test_dropNested_in_invalid_case(self):
+        input_text = 'AAA {{BBB {{CCC}}}}}} DDD {{EEE}}'
+        result = dropNested(input_text, r"{{", r"}}")
+        self.assertEqual(result, 'AAA }} DDD ')
 
 
 if __name__ == '__main__':
